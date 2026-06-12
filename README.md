@@ -790,11 +790,3 @@ No token storage in localStorage
 Manual single refresh lock
 /api/v1 route versioning
 ```
-
----
-
-## Initial Commit Message
-
-```txt
-chore(docs): add DeployGuard repository README
-```
