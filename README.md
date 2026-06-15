@@ -6,7 +6,7 @@ It collects structured production logs and operational events from multiple proj
 
 DeployGuard is not a ChatGPT wrapper.
 
-It is a production-focused engineering platform designed to preserve operational knowledge, reduce repeated investigation, and help teams understand production failures faster.
+DeployGuard is designed to become an operational memory layer for engineering teams.
 
 ---
 
@@ -36,7 +36,7 @@ The biggest problem is not the lack of logs.
 
 The biggest problem is that logs, incidents, RCA knowledge, and deployment context are fragmented and not searchable by meaning.
 
-DeployGuard solves this by becoming the operational memory layer for engineering teams.
+DeployGuard solves this by turning operational history into searchable engineering memory.
 
 ---
 
@@ -70,15 +70,17 @@ DeployGuard is designed to support multiple real-world projects such as:
 
 Each project has isolated access control.
 
+Important rule:
+
 A project admin automatically cannot access another project outside their assigned scope.
 
-For example:
+Examples:
 
 * Realcast Admin cannot access DSN.
 * DSN Admin cannot access Realcast.
 * OneRoster Admin cannot access Realcast or DSN.
 
-This rule must be enforced by the backend, not only by frontend UI.
+This restriction must be enforced by the backend, not only by frontend UI.
 
 ---
 
@@ -100,7 +102,7 @@ Responsibilities:
 
 ### Project Admin
 
-A project admin manages only one or more assigned project scopes.
+A project admin manages only assigned project scopes.
 
 Examples:
 
@@ -140,45 +142,249 @@ Examples:
 
 ---
 
-## Core Features
+## Architecture Summary
 
-### 1. Project-Scoped RBAC
+Initial architecture:
 
-DeployGuard uses project-scoped role-based access control.
+```txt
+External Applications
+Realcast / DSN / OneRoster / LTI
+        ↓
+REST Ingestion API
+        ↓
+Validation & Normalization
+        ↓
+PostgreSQL
+        ↓
+Embedding Job Queue
+        ↓
+pgvector
+        ↓
+Semantic Search
+        ↓
+AI-Assisted RCA
+        ↓
+DeployGuard Dashboard
+```
 
-Access is determined by:
+Initial backend strategy:
 
-* user
-* project
-* role
-* permissions
+```txt
+REST API:
+- ingestion
+- auth
+- user management
+- project management
+- operational commands
 
-Initial roles:
+GraphQL:
+- optional dashboard read model
+- optional semantic search exploration
+- optional nested RCA query
+```
 
-* platform_admin
-* project_admin
-* engineer
-* viewer
-* ingestion_client
-
-Example permissions:
-
-* project:read
-* project:update
-* members:manage
-* logs:ingest
-* logs:read
-* incidents:read
-* incidents:analyze
-* api_keys:manage
-
-Backend authorization is mandatory for every protected request.
-
-Frontend authorization is only for UI convenience and must not be trusted as the only security layer.
+GraphQL is not required in the first MVP. It should be introduced only when REST read endpoints become too fragmented or dashboard queries become deeply nested.
 
 ---
 
-### 2. Secure Authentication
+## Technology Stack
+
+### Backend
+
+Recommended stack:
+
+* Node.js
+* NestJS
+* TypeScript
+* PostgreSQL
+* pgvector
+* Redis
+* BullMQ
+* Pino
+* Zod or class-validator
+* Prisma or TypeORM
+
+ORM choice will be finalized before database implementation.
+
+### Frontend
+
+Recommended stack:
+
+* React
+* TypeScript
+* Vite
+* TailwindCSS
+* Zustand
+* React Router
+* Fetch or Axios wrapper with credentials included
+
+### AI and Vector
+
+Initial options:
+
+* OpenAI for reasoning
+* local embedding model or OpenAI embedding
+* pgvector for vector storage
+
+Future options:
+
+* local LLM
+* hybrid reasoning
+* Qdrant or Milvus for large-scale vector search
+
+---
+
+## Strict Engineering Rules
+
+DeployGuard must follow strict engineering rules.
+
+Required:
+
+* strict TypeScript
+* no `any`
+* no magic values
+* env-driven configuration
+* constants for domain values
+* compile-safe migrations
+* Prettier formatting
+* clear module boundaries
+* no half-refactor
+* no function references before implementation
+* no deleting functions before all callers are migrated
+* no unsafe token storage
+* no direct project access without backend authorization check
+
+TypeScript rule:
+
+```txt
+No any.
+Use explicit types.
+Use unknown when input type is not trusted.
+Use DTO/schema validation at boundaries.
+```
+
+---
+
+## Repository Structure
+
+Initial structure:
+
+```txt
+deployguard/
+├── README.md
+├── PRD.md
+├── backend/
+│   ├── src/
+│   ├── test/
+│   ├── .env.example
+│   ├── package.json
+│   └── tsconfig.json
+└── frontend/
+    ├── src/
+    ├── .env.example
+    ├── package.json
+    └── tsconfig.json
+```
+
+Important decision:
+
+There is no root `.env.example`.
+
+Environment files are separated by application:
+
+```txt
+backend/.env.example
+frontend/.env.example
+```
+
+---
+
+## Environment Variables
+
+### Backend
+
+File:
+
+```txt
+backend/.env.example
+```
+
+Example:
+
+```env
+NODE_ENV=development
+BACKEND_PORT=3000
+FRONTEND_URL=http://localhost:5173
+
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=deployguard
+POSTGRES_PASSWORD=deployguard_password
+POSTGRES_DB=deployguard
+DATABASE_URL=postgresql://deployguard:deployguard_password@localhost:5432/deployguard
+
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_URL=redis://localhost:6379
+
+LOG_LEVEL=debug
+LOG_PRETTY=true
+LOG_FILE_ENABLED=true
+LOG_FILE_PATH=logs/deployguard-api.log
+```
+
+### Frontend
+
+File:
+
+```txt
+frontend/.env.example
+```
+
+Example:
+
+```env
+VITE_API_BASE_URL=http://localhost:3000/api/v1
+```
+
+---
+
+## API Versioning
+
+DeployGuard uses route versioning.
+
+Initial API prefix:
+
+```txt
+/api/v1
+```
+
+Examples:
+
+```txt
+POST /api/v1/auth/login
+POST /api/v1/auth/logout
+POST /api/v1/auth/refresh
+GET  /api/v1/auth/me
+
+POST /api/v1/ingest/logs
+
+GET  /api/v1/projects
+GET  /api/v1/incidents
+```
+
+Versioning rule:
+
+```txt
+/api/v1 = stable contract
+/api/v2 = breaking changes only
+```
+
+Adding optional response fields should not require a new API version.
+
+---
+
+## Authentication Strategy
 
 DeployGuard supports:
 
@@ -233,7 +439,7 @@ DeployGuard must implement:
 
 ---
 
-### 3. Session Restore Flow
+## Session Restore Flow
 
 When the dashboard loads, the frontend calls:
 
@@ -289,7 +495,87 @@ No external mutex library is required.
 
 ---
 
-### 4. User Management
+## RBAC Strategy
+
+DeployGuard uses project-scoped role-based access control.
+
+Access is determined by:
+
+* user
+* project
+* role
+* permissions
+
+Initial roles:
+
+* platform_admin
+* project_admin
+* engineer
+* viewer
+* ingestion_client
+
+Example permissions:
+
+* project:read
+* project:update
+* members:manage
+* logs:ingest
+* logs:read
+* incidents:read
+* incidents:analyze
+* api_keys:manage
+
+Backend authorization is mandatory for every protected request.
+
+Frontend authorization is only for UI convenience and must not be trusted as the only security layer.
+
+Important rule:
+
+A project admin automatically cannot access another project outside their assigned scope.
+
+---
+
+## Multi-Tenant Strategy
+
+DeployGuard is a project-scoped internal multi-tenant system.
+
+Initial database strategy:
+
+```txt
+Single PostgreSQL database
+Project isolation using project_id
+Backend-enforced RBAC
+```
+
+DeployGuard will not use one database per project in the MVP.
+
+Reason:
+
+* simpler migration
+* simpler backup
+* simpler analytics
+* simpler local development
+* easier cross-project platform administration
+* better MVP speed
+
+Important tables must include `project_id` where relevant:
+
+* logs
+* incidents
+* api_keys
+* project_memberships
+* log_embeddings
+* incident_embeddings
+* audit_logs
+* embedding_jobs
+
+Future option:
+
+Multi-database isolation may be considered only if DeployGuard becomes an external SaaS product or if enterprise compliance requires physical tenant isolation.
+
+---
+
+## User Management
 
 DeployGuard must support user management.
 
@@ -315,7 +601,7 @@ Local auth must work without OIDC.
 
 ---
 
-### 5. REST API for Ingestion
+## REST API for Ingestion
 
 DeployGuard uses REST API for ingestion because ingestion must be simple, stable, and easy to call from different systems.
 
@@ -360,39 +646,7 @@ Make log searchable
 
 ---
 
-### 6. Optional GraphQL for Dashboard
-
-DeployGuard may use GraphQL for read-heavy dashboard features.
-
-GraphQL is useful for:
-
-* nested incident queries
-* project dashboard
-* RCA exploration
-* semantic search result composition
-* reducing over-fetching and under-fetching
-
-Initial strategy:
-
-```txt
-REST:
-- ingestion
-- auth
-- user management
-- project management
-- operational commands
-
-GraphQL:
-- optional dashboard read model
-- semantic search exploration
-- nested RCA queries
-```
-
-GraphQL is optional and should be introduced only when REST read endpoints become too fragmented or dashboard queries become deeply nested.
-
----
-
-### 7. PostgreSQL as Primary Database
+## PostgreSQL
 
 DeployGuard uses PostgreSQL as the primary relational database.
 
@@ -421,7 +675,39 @@ DeployGuard must use:
 
 ---
 
-### 8. pgvector as Initial Vector Storage
+## Local PostgreSQL Setup
+
+Current recommended local database credentials:
+
+```env
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=deployguard
+POSTGRES_PASSWORD=deployguard_password
+POSTGRES_DB=deployguard
+DATABASE_URL=postgresql://deployguard:deployguard_password@localhost:5432/deployguard
+```
+
+Create local role and database:
+
+```bash
+psql postgres
+```
+
+```sql
+CREATE ROLE deployguard WITH LOGIN PASSWORD 'deployguard_password';
+CREATE DATABASE deployguard OWNER deployguard;
+```
+
+Connect as application user:
+
+```bash
+psql -h localhost -p 5432 -U deployguard -d deployguard
+```
+
+---
+
+## pgvector
 
 DeployGuard starts with pgvector.
 
@@ -469,7 +755,74 @@ Application services must not depend directly on pgvector SQL everywhere.
 
 ---
 
-### 9. Redis Usage
+## Local pgvector Setup Note
+
+pgvector must be enabled once per database.
+
+For local development, the extension may require a PostgreSQL superuser.
+
+If normal database user fails with:
+
+```txt
+ERROR: permission denied to create extension "vector"
+HINT: Must be superuser to create this extension.
+```
+
+Then enable the extension using a PostgreSQL superuser.
+
+Example:
+
+```bash
+psql -d deployguard
+```
+
+Then run:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+After the extension is created, the normal `deployguard` database user can use vector columns and vector queries.
+
+Verify extension:
+
+```sql
+SELECT extname, extversion
+FROM pg_extension
+WHERE extname = 'vector';
+```
+
+Smoke test:
+
+```sql
+CREATE TABLE IF NOT EXISTS pgvector_smoke_test (
+  id SERIAL PRIMARY KEY,
+  embedding vector(3)
+);
+
+INSERT INTO pgvector_smoke_test (embedding)
+VALUES
+  ('[1,2,3]'),
+  ('[1,1,1]');
+
+SELECT
+  id,
+  embedding <-> '[1,2,3]'::vector AS l2_distance
+FROM pgvector_smoke_test
+ORDER BY l2_distance ASC;
+
+DROP TABLE pgvector_smoke_test;
+```
+
+Expected result:
+
+```txt
+The row with embedding [1,2,3] should return distance 0 and appear first.
+```
+
+---
+
+## Redis
 
 DeployGuard uses Redis for:
 
@@ -496,142 +849,320 @@ For live updates later, DeployGuard may use:
 
 ---
 
-## Technology Stack
+## Logging
 
-### Backend
+DeployGuard uses Pino for structured backend logging.
 
-Recommended stack:
+Reason:
 
-* Node.js
-* NestJS
-* TypeScript
-* PostgreSQL
-* pgvector
-* Redis
-* BullMQ
-* Zod or class-validator
-* Prisma or TypeORM
+DeployGuard is a log-heavy platform. It should have proper internal logging from the beginning.
 
-ORM choice will be finalized before database implementation.
+Logging must cover:
 
-### Frontend
+* incoming request
+* response status
+* request duration
+* error stack
+* auth events
+* RBAC denial
+* ingestion accepted/rejected
+* embedding job status
+* vector search latency
+* AI analysis latency
+* external API failure
+* database query failure
 
-Recommended stack:
+Sensitive values must not be logged.
 
-* React
-* TypeScript
-* Vite
-* TailwindCSS
-* Zustand
-* React Router
-* Fetch or Axios wrapper with credentials included
+Do not log:
 
-### AI and Vector
+* password
+* password hash
+* access token
+* refresh token
+* API key
+* cookie
+* authorization header
+* raw secret value
 
-Initial options:
+Backend logging environment variables:
 
-* OpenAI for reasoning
-* local embedding model or OpenAI embedding
-* pgvector for vector storage
+```env
+LOG_LEVEL=debug
+LOG_PRETTY=true
+LOG_FILE_ENABLED=true
+LOG_FILE_PATH=logs/deployguard-api.log
+```
+
+Development behavior:
+
+```txt
+LOG_PRETTY=true
+LOG_FILE_ENABLED=true
+```
+
+Expected output:
+
+* readable logs in terminal
+* local log file at `backend/logs/deployguard-api.log`
+
+Production behavior:
+
+```txt
+LOG_PRETTY=false
+LOG_FILE_ENABLED=false
+```
+
+Expected output:
+
+* structured JSON logs to stdout
+* log collection handled by process manager, container runtime, or cloud logging
+
+The `logs/` directory must be ignored by git.
+
+---
+
+## Log Rotation
+
+If local file logging is enabled, the log file can grow continuously.
+
+Example:
+
+```txt
+backend/logs/deployguard-api.log
+```
+
+Without rotation, the file can grow from MB to GB and eventually cause disk issues.
+
+Log rotation means splitting logs into multiple files based on size or time.
+
+Examples by time:
+
+```txt
+deployguard-api-2026-06-15.log
+deployguard-api-2026-06-16.log
+deployguard-api-2026-06-17.log
+```
+
+Examples by size:
+
+```txt
+deployguard-api.log
+deployguard-api.1.log
+deployguard-api.2.log
+```
+
+Retention example:
+
+```txt
+Keep only the last 7 days of logs.
+Delete older logs automatically.
+```
+
+Initial decision:
+
+Log rotation is not required for the current MVP development phase.
 
 Future options:
 
-* local LLM
-* hybrid reasoning
-* Qdrant or Milvus for large-scale vector search
+* PM2 log rotation
+* OS logrotate
+* Pino rotation transport
+* external log collector
+* cloud logging
 
 ---
 
-## API Versioning
+## Frontend UI Direction
 
-DeployGuard uses route versioning.
-
-Initial API prefix:
+Initial UI direction:
 
 ```txt
-/api/v1
+Default light mode
+No dark mode by default
+Dark/light toggle may be added later
 ```
 
-Examples:
+The first dashboard should prioritize:
 
-```txt
-POST /api/v1/auth/login
-POST /api/v1/auth/logout
-POST /api/v1/auth/refresh
-GET  /api/v1/auth/me
-
-POST /api/v1/ingest/logs
-
-GET  /api/v1/projects
-GET  /api/v1/incidents
-```
-
-Versioning rule:
-
-```txt
-/api/v1 = stable contract
-/api/v2 = breaking changes only
-```
-
-Adding optional response fields should not require a new API version.
+* clarity
+* readability
+* operational focus
+* fast investigation
+* project-scoped navigation
 
 ---
 
-## Strict Engineering Rules
+## Frontend State Management
 
-DeployGuard must follow strict engineering rules.
+DeployGuard uses Zustand for frontend global state.
 
-Required:
+Initial global state:
 
-* strict TypeScript
-* no `any`
-* no magic values
-* env-driven configuration
-* constants for domain values
-* compile-safe migrations
-* Prettier formatting
-* clear module boundaries
-* no half-refactor
-* no function references before implementation
-* no deleting functions before all callers are migrated
-* no unsafe token storage
-* no direct project access without backend authorization check
+* authenticated user profile
+* project access
+* roles
+* permissions
+* selected project
 
-TypeScript rule:
+Reason:
 
-```txt
-No any.
-Use explicit types.
-Use unknown when input type is not trusted.
-Use DTO/schema validation at boundaries.
-```
+* lightweight
+* simple API
+* less boilerplate than Redux
+* suitable for auth/profile state
+* easy to use across dashboard components
 
 ---
 
-## Suggested Repository Structure
+## Docker Decision
 
-Initial monorepo structure:
+Docker is optional during early development.
+
+Reason:
+
+The project is currently developed by one developer, so strict environment version matching across a team is not the main priority.
+
+Initial strategy:
 
 ```txt
-deployguard/
-├── README.md
-├── PRD.md
-├── backend/
-│   ├── src/
-│   ├── test/
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/
-│   ├── src/
-│   ├── package.json
-│   └── tsconfig.json
-├── docker/
-│   └── postgres/
-├── docs/
-│   ├── architecture.md
-│   ├── security.md
-│   └── api-contract.md
-└── docker-compose.yml
+Phase 2:
+No Docker required.
+
+Phase 3+:
+Use local PostgreSQL and Redis first.
+
+If pgvector or Redis local setup becomes painful:
+Docker can be introduced as a developer convenience.
+```
+
+Docker may still be useful later for:
+
+* PostgreSQL + pgvector setup
+* Redis setup
+* production-like local testing
+* deployment packaging
+* onboarding future developers
+
+But Docker is not mandatory for the initial MVP phase.
+
+---
+
+## NestJS CLI Usage
+
+Use NestJS CLI to improve Developer Experience.
+
+Generate module:
+
+```bash
+nest g module health
+```
+
+Generate controller:
+
+```bash
+nest g controller health
+```
+
+Generate service:
+
+```bash
+nest g service health
+```
+
+Short version:
+
+```bash
+nest g mo health
+nest g co health
+nest g s health
+```
+
+Generate full REST resource:
+
+```bash
+nest g resource projects
+```
+
+Use `resource` for domain CRUD modules such as:
+
+* users
+* projects
+* logs
+* incidents
+
+Use manual module/service generation for infrastructure modules such as:
+
+* database
+* redis
+* logging
+* vector
+
+---
+
+## Local Development
+
+### Backend
+
+Install dependencies:
+
+```bash
+cd backend
+npm install
+```
+
+Create env file:
+
+```bash
+cp .env.example .env
+```
+
+Run backend:
+
+```bash
+npm run start:dev
+```
+
+Health check:
+
+```bash
+curl http://localhost:3000/api/v1/health
+```
+
+Expected response:
+
+```json
+{
+  "status": "ok",
+  "service": "deployguard-api"
+}
+```
+
+### Frontend
+
+Install dependencies:
+
+```bash
+cd frontend
+npm install
+```
+
+Create env file:
+
+```bash
+cp .env.example .env
+```
+
+Run frontend:
+
+```bash
+npm run dev
+```
+
+Open:
+
+```txt
+http://localhost:5173
 ```
 
 ---
@@ -708,9 +1239,17 @@ Repository baseline, README, PRD, architecture decisions.
 
 Backend and frontend project skeleton.
 
+### Phase 2.1
+
+Structured backend logging with Pino and environment loading fix.
+
+### Phase 2.2
+
+Optional local file logging and pgvector setup notes.
+
 ### Phase 3
 
-Database setup with PostgreSQL, connection pooling, and migration strategy.
+Database setup, ORM decision, PostgreSQL pooling, and migration strategy.
 
 ### Phase 4
 
@@ -779,6 +1318,7 @@ No any
 REST for ingestion
 GraphQL optional for dashboard
 PostgreSQL as primary relational DB
+Single database with project_id isolation
 pgvector as initial vector storage
 Redis for denylist and async jobs
 Zustand for frontend global state
@@ -789,4 +1329,8 @@ HttpOnly cookies for web auth
 No token storage in localStorage
 Manual single refresh lock
 /api/v1 route versioning
+Default light mode UI
+Docker optional during early development
+Pino for backend structured logging
+Optional local file logging for development debugging
 ```
