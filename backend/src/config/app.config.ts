@@ -6,6 +6,8 @@ export const ENV_KEYS = {
   FRONTEND_URL: "FRONTEND_URL",
   LOG_LEVEL: "LOG_LEVEL",
   LOG_PRETTY: "LOG_PRETTY",
+  LOG_FILE_ENABLED: "LOG_FILE_ENABLED",
+  LOG_FILE_PATH: "LOG_FILE_PATH",
 } as const;
 
 const DEFAULT_NODE_ENV = "development";

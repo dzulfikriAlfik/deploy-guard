@@ -8,13 +8,19 @@ import {
   getOptionalStringConfig,
 } from "../config/app.config";
 import {
+  DEFAULT_LOG_FILE_PATH,
   LOGGER_REDACT_CENSOR,
   LOGGER_REDACT_PATHS,
 } from "./logging.constants";
-import { resolveRequestId } from "./logging.utils";
+import { 
+  ensureLogFileDirectory,
+  resolveLogFilePath,
+  resolveRequestId,
+} from "./logging.utils";
 
 const DEFAULT_LOG_LEVEL = "info";
 const DEFAULT_LOG_PRETTY = false;
+const DEFAULT_LOG_FILE_ENABLED = false;
 
 @Module({
   imports: [
@@ -33,6 +39,56 @@ const DEFAULT_LOG_PRETTY = false;
           DEFAULT_LOG_PRETTY,
         );
 
+        const logFileEnabled = getOptionalBooleanConfig(
+          configService,
+          ENV_KEYS.LOG_FILE_ENABLED,
+          DEFAULT_LOG_FILE_ENABLED,
+        );
+
+        const logFilePath = getOptionalStringConfig(
+          configService,
+          ENV_KEYS.LOG_FILE_PATH,
+          DEFAULT_LOG_FILE_PATH,
+        );
+
+        if (logFileEnabled) {
+          ensureLogFileDirectory(logFilePath);
+        }
+
+        const transportTargets = [
+          ...(logPretty
+            ? [
+                {
+                  target: "pino-pretty",
+                  level: logLevel,
+                  options: {
+                    singleLine: true,
+                    translateTime: "SYS:standard",
+                  },
+                },
+              ]
+            : [
+                {
+                  target: "pino/file",
+                  level: logLevel,
+                  options: {
+                    destination: 1,
+                  },
+                },
+              ]),
+          ...(logFileEnabled
+            ? [
+                {
+                  target: "pino/file",
+                  level: logLevel,
+                  options: {
+                    destination: resolveLogFilePath(logFilePath),
+                  },
+                },
+              ]
+            : []),
+        ];
+
         return {
           pinoHttp: {
             level: logLevel,
@@ -41,15 +97,9 @@ const DEFAULT_LOG_PRETTY = false;
               paths: [...LOGGER_REDACT_PATHS],
               censor: LOGGER_REDACT_CENSOR,
             },
-            transport: logPretty
-              ? {
-                  target: "pino-pretty",
-                  options: {
-                    singleLine: true,
-                    translateTime: "SYS:standard",
-                  },
-                }
-              : undefined,
+            transport: {
+              targets: transportTargets,
+            },
           },
         };
       },

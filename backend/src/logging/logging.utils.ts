@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage } from "node:http";
+import { mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 import { REQUEST_ID_HEADER } from "./logging.constants";
 
@@ -19,4 +21,17 @@ export function resolveRequestId(request: IncomingMessage): string {
   }
 
   return randomUUID();
+}
+
+export function resolveLogFilePath(logFilePath: string): string {
+  return resolve(process.cwd(), logFilePath);
+}
+
+export function ensureLogFileDirectory(logFilePath: string): void {
+  const resolvedLogFilePath = resolveLogFilePath(logFilePath);
+  const logDirectory = dirname(resolvedLogFilePath);
+
+  mkdirSync(logDirectory, {
+    recursive: true,
+  });
 }

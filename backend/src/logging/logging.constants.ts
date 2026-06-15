@@ -23,3 +23,5 @@ export const LOGGER_REDACT_PATHS = [
 export const LOGGER_REDACT_CENSOR = "[REDACTED]" as const;
 
 export const REQUEST_ID_HEADER = "x-request-id" as const;
+
+export const DEFAULT_LOG_FILE_PATH = "logs/deployguard-api.log" as const;
