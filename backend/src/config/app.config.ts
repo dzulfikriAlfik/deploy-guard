@@ -1,33 +1,66 @@
-const DEFAULT_BACKEND_PORT = 3000;
-const DEFAULT_FRONTEND_URL = "http://localhost:5173";
+import { ConfigService } from "@nestjs/config";
+
+export const ENV_KEYS = {
+  NODE_ENV: "NODE_ENV",
+  BACKEND_PORT: "BACKEND_PORT",
+  FRONTEND_URL: "FRONTEND_URL",
+  LOG_LEVEL: "LOG_LEVEL",
+  LOG_PRETTY: "LOG_PRETTY",
+} as const;
+
 const DEFAULT_NODE_ENV = "development";
 
-function getOptionalEnvValue(key: string): string | undefined {
-  return process.env[key];
+export function getEnvFilePaths(): string[] {
+  const nodeEnv = process.env[ENV_KEYS.NODE_ENV] ?? DEFAULT_NODE_ENV;
+
+  return [`.env.${nodeEnv}`, ".env"];
 }
 
-function getNumberEnvValue(key: string, fallbackValue: number): number {
-  const rawValue = getOptionalEnvValue(key);
+export function getRequiredStringConfig(
+  configService: ConfigService,
+  key: string,
+): string {
+  const value = configService.get<string>(key);
 
-  if (!rawValue) {
-    return fallbackValue;
+  if (!value) {
+    throw new Error(`Missing required config value: ${key}`);
   }
 
+  return value;
+}
+
+export function getOptionalStringConfig(
+  configService: ConfigService,
+  key: string,
+  fallbackValue: string,
+): string {
+  return configService.get<string>(key) ?? fallbackValue;
+}
+
+export function getRequiredNumberConfig(
+  configService: ConfigService,
+  key: string,
+): number {
+  const rawValue = getRequiredStringConfig(configService, key);
   const parsedValue = Number(rawValue);
 
   if (Number.isNaN(parsedValue)) {
-    throw new Error(`Invalid number environment variable: ${key}`);
+    throw new Error(`Invalid number config value: ${key}`);
   }
 
   return parsedValue;
 }
 
-function getStringEnvValue(key: string, fallbackValue: string): string {
-  return getOptionalEnvValue(key) ?? fallbackValue;
-}
+export function getOptionalBooleanConfig(
+  configService: ConfigService,
+  key: string,
+  fallbackValue: boolean,
+): boolean {
+  const rawValue = configService.get<string>(key);
 
-export const APP_CONFIG = {
-  PORT: getNumberEnvValue("BACKEND_PORT", DEFAULT_BACKEND_PORT),
-  FRONTEND_URL: getStringEnvValue("FRONTEND_URL", DEFAULT_FRONTEND_URL),
-  NODE_ENV: getStringEnvValue("NODE_ENV", DEFAULT_NODE_ENV),
-} as const;
+  if (!rawValue) {
+    return fallbackValue;
+  }
+
+  return rawValue.toLowerCase() === "true";
+}
